@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDynamicContext, DynamicWidget } from '@dynamic-labs/sdk-react-core';
 import type { Address, Hex } from 'viem';
-import { base } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 
 // Test contract address for delegation
 const TEST_DELEGATE_CONTRACT = '0x0000000000000000000000000000000000000001' as Address;
@@ -20,7 +20,7 @@ interface DynamicWaasConnector {
 }
 
 export default function Eip7702Test() {
-  const { primaryWallet } = useDynamicContext();
+  const { primaryWallet, network } = useDynamicContext();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [running, setRunning] = useState(false);
   const [contractAddress, setContractAddress] = useState<string>(TEST_DELEGATE_CONTRACT);
@@ -62,22 +62,26 @@ export default function Eip7702Test() {
         log('info', 'isSignAuthorizationSupported not available or returned false');
       }
 
-      // Step 3: Switch to target network if needed
+      // Step 3: Determine chain based on active network
       log('info', 'Step 3: Checking network...');
+      const isTestnet = network === baseSepolia.id || network === String(baseSepolia.id);
+      const targetChain = isTestnet ? baseSepolia : base;
+      log('info', `Using chain: ${targetChain.name} (${targetChain.id})`);
+
       const availableChains = connector.evmNetworks?.map(n => n.chainId) || [];
       log('info', `Available chains: ${JSON.stringify(availableChains)}`);
 
-      if (availableChains.includes(base.id)) {
+      if (availableChains.includes(targetChain.id)) {
         const currentNetwork = await connector.getNetwork?.();
-        if (currentNetwork !== base.id) {
-          log('info', `Switching to Base (${base.id})...`);
-          await connector.switchNetwork?.({ networkChainId: base.id });
-          log('success', 'Switched to Base');
+        if (currentNetwork !== targetChain.id) {
+          log('info', `Switching to ${targetChain.name} (${targetChain.id})...`);
+          await connector.switchNetwork?.({ networkChainId: targetChain.id });
+          log('success', `Switched to ${targetChain.name}`);
         } else {
-          log('success', 'Already on Base');
+          log('success', `Already on ${targetChain.name}`);
         }
       } else {
-        log('error', 'Base not available. Add it in Dynamic dashboard.');
+        log('error', `${targetChain.name} not available. Add it in Dynamic dashboard.`);
         return;
       }
 
@@ -117,11 +121,11 @@ export default function Eip7702Test() {
       }
 
       log('info', `Signing authorization for contract: ${contractAddress}`);
-      log('info', `Chain ID: ${base.id}`);
+      log('info', `Chain ID: ${targetChain.id}`);
 
       const authorization = await signer.signAuthorization({
         contractAddress: contractAddress as Address,
-        chainId: base.id,
+        chainId: targetChain.id,
       });
 
       log('success', '=== EIP-7702 AUTHORIZATION SIGNED SUCCESSFULLY! ===');

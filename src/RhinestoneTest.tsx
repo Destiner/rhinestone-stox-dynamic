@@ -3,7 +3,7 @@ import { RhinestoneSDK } from "@rhinestone/sdk";
 import { useState } from "react";
 import { type Address, type Hex, type SignedAuthorizationList } from "viem";
 import { toAccount } from "viem/accounts";
-import { base } from "viem/chains";
+import { base, baseSepolia } from "viem/chains";
 
 const RHINESTONE_API_KEY = import.meta.env.VITE_RHINESTONE_API_KEY;
 
@@ -30,7 +30,7 @@ const convertBigIntsToString = (obj: any): any => {
 };
 
 export default function RhinestoneTest() {
-	const { primaryWallet } = useDynamicContext();
+	const { primaryWallet, network } = useDynamicContext();
 	const [logs, setLogs] = useState<LogEntry[]>([]);
 	const [running, setRunning] = useState(false);
 
@@ -119,10 +119,15 @@ export default function RhinestoneTest() {
 				log("error", `signEip7702InitData failed: ${e.message}`);
 			}
 
+			// Determine chain based on active network
+			const isTestnet = network === baseSepolia.id || network === String(baseSepolia.id);
+			const chain = isTestnet ? baseSepolia : base;
+			log("info", `Using chain: ${chain.name} (${chain.id})`);
+
 			// Prepare transaction
 			log("info", "Preparing transaction...");
 			const preparedTx = await rhinestoneAccount.prepareTransaction({
-				chain: base,
+				chain,
 				calls: [{ to: rhinestoneAccount.getAddress() as Address, value: 0n, data: "0x" as Hex }],
 				feeAsset: "USDC" as const,
 				eip7702InitSignature,
